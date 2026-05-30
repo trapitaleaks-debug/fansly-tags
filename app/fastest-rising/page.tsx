@@ -7,21 +7,23 @@ export const dynamic = "force-dynamic"
 export default async function FastestRising() {
   let data = null
   let error = null
-  try {
-    data = await getTags()
-  } catch {
-    error = "Could not load hashtag data — Fansly API may be temporarily unavailable. Try refreshing."
+  try { data = await getTags("24h") } catch {
+    error = "Could not load hashtag data. Try refreshing."
   }
 
   return (
     <PageShell
       title="Fastest Rising"
-      description="Hashtags with the highest views-per-post ratio — proxy for tags currently blowing up. Use for Flash Momentum."
+      description={data?.hasSnapshotData
+        ? "Hashtags with the highest % view growth in the last 24 hours."
+        : "Hashtags most actively used in current Fansly FYP posts. Building 24h history…"}
       fetchedAt={data?.fetchedAt ?? null}
       tagCount={data?.tagCount}
+      hasSnapshotData={data?.hasSnapshotData}
+      lockedFilter
       error={error}
     >
-      <HashtagTable rows={data?.fastestRising ?? []} />
+      <HashtagTable rows={data?.fastestRising ?? []} showChange={data?.hasSnapshotData} />
     </PageShell>
   )
 }

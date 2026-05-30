@@ -1,11 +1,15 @@
+export type TimeFilter = "24h" | "7d" | "30d" | "90d"
+
 export interface HashtagRow {
   rank: number
   tag: string
   viewCount: number
   postCount: number
-  saturationScore: number  // postCount / viewCount — lower = less crowded
-  impactScore: number      // views * log(fypFreq+1) / postCount^0.4
-  fypFrequency: number     // how many recent FYP posts used this tag
+  saturationScore: number
+  impactScore: number
+  fypFrequency: number
+  changePct: number | null  // % change vs snapshot for selected time period (null = no data yet)
+  deltaViews: number | null // absolute view count change
 }
 
 export type Category = "most-viewed" | "fastest-rising" | "lowest-saturation" | "highest-impact"
@@ -17,4 +21,6 @@ export interface TagsResponse {
   highestImpact: HashtagRow[]
   fetchedAt: number
   tagCount: number
+  timeFilter: TimeFilter
+  hasSnapshotData: boolean // false on first run before any snapshots saved
 }

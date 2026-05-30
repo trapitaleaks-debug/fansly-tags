@@ -1,5 +1,7 @@
+import { Suspense } from "react"
 import CategoryNav from "./CategoryNav"
 import Header from "./Header"
+import TimeFilter from "./TimeFilter"
 
 interface Props {
   title: string
@@ -8,18 +10,27 @@ interface Props {
   tagCount?: number
   children: React.ReactNode
   error?: string | null
+  lockedFilter?: boolean
+  hasSnapshotData?: boolean
 }
 
-export default function PageShell({ title, description, fetchedAt, tagCount, children, error }: Props) {
+export default function PageShell({
+  title, description, fetchedAt, tagCount, children, error, lockedFilter, hasSnapshotData
+}: Props) {
   return (
     <div className="flex flex-col min-h-screen bg-black">
       <Header fetchedAt={fetchedAt} tagCount={tagCount} />
       <CategoryNav />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
-        <div className="mb-5">
-          <h1 className="text-xl font-bold text-[#f5f5f5]">{title}</h1>
-          <p className="text-sm text-[#555] mt-1">{description}</p>
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-[#f5f5f5]">{title}</h1>
+            <p className="text-sm text-[#555] mt-1">{description}</p>
+          </div>
+          <Suspense fallback={null}>
+            <TimeFilter locked={lockedFilter} hasSnapshotData={hasSnapshotData} />
+          </Suspense>
         </div>
 
         {error && (
