@@ -18,6 +18,7 @@ export default async function MostViewed() {
       title="Most Viewed"
       description="Hashtags ranked by total view count — best for Evergreen tags that bring consistent long-term exposure."
       fetchedAt={data?.fetchedAt ?? null}
+      tagCount={data?.tagCount}
       error={error}
     >
       <HashtagTable rows={data?.mostViewed ?? []} />

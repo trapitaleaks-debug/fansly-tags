@@ -18,6 +18,7 @@ export default async function LowestSaturation() {
       title="Lowest Saturation"
       description="Hashtags with fewest posts relative to views — less competition, better chance to rank. Saturation = posts ÷ views (lower is better)."
       fetchedAt={data?.fetchedAt ?? null}
+      tagCount={data?.tagCount}
       error={error}
     >
       <HashtagTable rows={data?.lowestSaturation ?? []} />

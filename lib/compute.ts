@@ -5,16 +5,17 @@ export function saturationScore(postCount: number, viewCount: number): number {
   return postCount / viewCount
 }
 
-// views / sqrt(postCount) — balances raw reach with competition level
-// Higher than pure views/posts (which is Fastest Rising) but penalizes saturation more than Most Viewed
-export function impactScore(viewCount: number, _saturation: number, postCount: number): number {
-  return viewCount / (Math.sqrt(postCount) + 1)
+// views * log(fypFreq+1) / postCount^0.4
+// Rewards: high reach + active in FYP right now + not too many competing posts
+export function impactScore(viewCount: number, postCount: number, fypFrequency: number): number {
+  return (viewCount * Math.log(fypFrequency + 2)) / (Math.pow(postCount + 1, 0.4))
 }
 
 export function toRow(
   tag: string,
   viewCount: number,
   postCount: number,
+  fypFrequency: number,
   rank: number
 ): HashtagRow {
   const sat = saturationScore(postCount, viewCount)
@@ -24,7 +25,8 @@ export function toRow(
     viewCount,
     postCount,
     saturationScore: sat,
-    impactScore: impactScore(viewCount, sat, postCount),
+    impactScore: impactScore(viewCount, postCount, fypFrequency),
+    fypFrequency,
   }
 }
 

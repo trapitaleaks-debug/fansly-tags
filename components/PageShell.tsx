@@ -5,14 +5,15 @@ interface Props {
   title: string
   description: string
   fetchedAt: number | null
+  tagCount?: number
   children: React.ReactNode
   error?: string | null
 }
 
-export default function PageShell({ title, description, fetchedAt, children, error }: Props) {
+export default function PageShell({ title, description, fetchedAt, tagCount, children, error }: Props) {
   return (
     <div className="flex flex-col min-h-screen bg-black">
-      <Header fetchedAt={fetchedAt} />
+      <Header fetchedAt={fetchedAt} tagCount={tagCount} />
       <CategoryNav />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">

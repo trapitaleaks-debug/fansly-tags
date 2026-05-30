@@ -18,6 +18,7 @@ export default async function FastestRising() {
       title="Fastest Rising"
       description="Hashtags with the highest views-per-post ratio — proxy for tags currently blowing up. Use for Flash Momentum."
       fetchedAt={data?.fetchedAt ?? null}
+      tagCount={data?.tagCount}
       error={error}
     >
       <HashtagTable rows={data?.fastestRising ?? []} />

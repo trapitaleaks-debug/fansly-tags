@@ -18,6 +18,7 @@ export default async function HighestImpact() {
       title="Highest Impact"
       description="Best balance of high views and low saturation — views ÷ (saturation + 1). Use for Core Growth tags."
       fetchedAt={data?.fetchedAt ?? null}
+      tagCount={data?.tagCount}
       error={error}
     >
       <HashtagTable rows={data?.highestImpact ?? []} />
