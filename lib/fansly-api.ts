@@ -1,3 +1,12 @@
+import { fanslyFetch, installFanslyEgressGuard, NoProxyError } from "./fansly-egress.mjs"
+
+// Every Fansly call leaves through the "anon" proxy (CRM fansly_proxies, logged-out reads that
+// belong to no model). No proxy → NoProxyError, never a direct call (Vito, 13 Oct 2026).
+// Server-only module (Node runtime): the helper uses undici + node:fs.
+installFanslyEgressGuard()
+const ANON = { label: "anon" }
+const logRefused = (e: unknown) => { if (e instanceof NoProxyError) console.warn(e.message) }
+
 const FANSLY_BASE = "https://apiv3.fansly.com/api/v1"
 const FTOOLBOX_BASE = "https://ftoolbox-api.zergo0.dev/api"
 const HEADERS = { "User-Agent": "FanslyTags/1.0" }
@@ -104,10 +113,11 @@ export async function getFYPFrequency(pages = 8): Promise<FYPFrequencyMap> {
   const freq: FYPFrequencyMap = {}
 
   const fetches = Array.from({ length: pages }, (_, i) =>
-    fetch(
+    fanslyFetch(
+      ANON,
       `${FANSLY_BASE}/contentdiscovery/media/suggestionsnew?before=&after=&tagIds=&limit=50&offset=${i * 50}&ngsw-bypass=true`,
       { headers: HEADERS, signal: AbortSignal.timeout(10000) }
-    ).then((r) => r.ok ? r.json() as Promise<FanslySuggestionsResponse> : null).catch(() => null)
+    ).then((r) => r.ok ? r.json() as Promise<FanslySuggestionsResponse> : null).catch((e) => { logRefused(e); return null })
   )
 
   const results = await Promise.all(fetches)
@@ -140,9 +150,10 @@ export async function fetchTagStats(tagName: string): Promise<FanslyTag | null> 
     }
   } catch { /* fall through */ }
 
-  // Fallback to Fansly API directly
+  // Fallback to the Fansly API (through the anon proxy)
   try {
-    const res = await fetch(
+    const res = await fanslyFetch(
+      ANON,
       `${FANSLY_BASE}/contentdiscovery/media/tag?tag=${encodeURIComponent(tagName)}&ngsw-bypass=true`,
       { headers: HEADERS, signal: AbortSignal.timeout(8000) }
     )
@@ -151,7 +162,8 @@ export async function fetchTagStats(tagName: string): Promise<FanslyTag | null> 
     const t = data.response?.mediaOfferSuggestionTag
     if (!t) return null
     return { id: t.id, tag: t.tag, viewCount: t.viewCount, postCount: t.postCount, ratio: t.viewCount / (t.postCount || 1) }
-  } catch {
+  } catch (e) {
+    logRefused(e)
     return null
   }
 }

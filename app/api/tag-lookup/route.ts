@@ -3,6 +3,7 @@ import { fetchTagStats } from "@/lib/fansly-api"
 import { toRow } from "@/lib/compute"
 
 export const dynamic = "force-dynamic"
+export const runtime = "nodejs" // fansly-api → lib/fansly-egress.mjs needs undici + node:fs
 
 export async function GET(req: NextRequest) {
   const tag = req.nextUrl.searchParams.get("tag")?.toLowerCase().replace(/^#/, "")

@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // lib/fansly-egress.mjs (Fansly proxy helper) loads undici from node_modules at runtime.
+  serverExternalPackages: ["undici"],
 };
 
 export default nextConfig;

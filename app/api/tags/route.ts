@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getTags } from "@/lib/get-tags"
 
 export const dynamic = "force-dynamic"
+export const runtime = "nodejs" // fansly-api → lib/fansly-egress.mjs needs undici + node:fs
 
 export async function GET() {
   try {
