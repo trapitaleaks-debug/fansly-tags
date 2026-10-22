@@ -1,42 +1,36 @@
 import { unstable_cache } from "next/cache"
-import { fetchAllTagsFromFToolbox, getFYPFrequency } from "./fansly-api"
+import { fetchAllTagsFromFToolbox } from "./fansly-api"
 import { toRow } from "./compute"
-import { saveSnapshot, getSnapshot } from "./kv"
+import { getSnapshot } from "./kv"
 import type { TagsResponse, TimeFilter, HashtagRow } from "./types"
 
 const MIN_VIEWS = 5000
-const MAX_ROWS = 100
+const MIN_TAGS = 3000
+const MAX_ROWS = 1000
+const DEFAULT_LIMIT = 100
 
 async function _fetchAllTags(timeFilter: TimeFilter): Promise<TagsResponse> {
-  const [ftoolboxTags, fypFrequency] = await Promise.all([
-    fetchAllTagsFromFToolbox(MIN_VIEWS),
-    getFYPFrequency(8),
-  ])
-
-  if (ftoolboxTags.length === 0) {
-    return {
-      mostViewed: [], fastestRising: [], lowestSaturation: [], highestImpact: [],
-      fetchedAt: Date.now(), tagCount: 0, timeFilter, hasSnapshotData: false,
-    }
+  const ftoolboxTags = await fetchAllTagsFromFToolbox(MIN_VIEWS)
+  if (ftoolboxTags.length < MIN_TAGS) {
+    throw new Error(`Insufficient tags from FToolbox: ${ftoolboxTags.length}`)
   }
 
-  // Save snapshot to KV (non-blocking — runs in background after response)
-  // Only save when timeFilter is the default (90d) to avoid duplicate saves
-  if (timeFilter === "90d") {
-    saveSnapshot(ftoolboxTags).catch(() => { /* non-critical */ })
-  }
+  const snapshot24h = await getSnapshot("24h")
+  const snapshot =
+    timeFilter === "90d"
+      ? null
+      : timeFilter === "24h"
+        ? snapshot24h
+        : await getSnapshot(timeFilter)
 
-  // Load snapshot for the selected time period
-  const snapshot = timeFilter !== "90d" ? await getSnapshot(timeFilter) : null
   const hasSnapshotData = snapshot !== null && Object.keys(snapshot).length > 0
+  const has24hSnapshot = snapshot24h !== null && Object.keys(snapshot24h).length > 0
 
   const allRows: HashtagRow[] = ftoolboxTags.map((t, i) =>
-    toRow(t.tag, t.viewCount, t.postCount, fypFrequency[t.tag.toLowerCase()] ?? 0, i + 1, snapshot)
+    toRow(t.tag, t.viewCount, t.postCount, i + 1, snapshot)
   )
 
   // ── MOST VIEWED ──────────────────────────────────────────────────────
-  // With snapshot: sort by delta views (absolute growth in period)
-  // Without snapshot: sort by total view count
   const mostViewed = [...allRows]
     .sort((a, b) =>
       hasSnapshotData
@@ -47,25 +41,22 @@ async function _fetchAllTags(timeFilter: TimeFilter): Promise<TagsResponse> {
     .slice(0, MAX_ROWS)
     .map((r, i) => ({ ...r, rank: i + 1 }))
 
-  // ── FASTEST RISING ────────────────────────────────────────────────────
-  // With snapshot: sort by % change (relative growth rate)
-  // Without snapshot: FYP frequency, fallback to views/post ratio
-  const hasFYPData = allRows.some((r) => r.fypFrequency > 0)
-  const fastestRising = [...allRows]
-    .filter((r) => {
-      if (hasSnapshotData) return r.changePct !== null && (r.changePct ?? 0) > 0
-      return hasFYPData ? r.fypFrequency > 0 : r.postCount >= 5
-    })
-    .sort((a, b) => {
-      if (hasSnapshotData) return (b.changePct ?? 0) - (a.changePct ?? 0)
-      if (hasFYPData) return b.fypFrequency - a.fypFrequency || b.viewCount - a.viewCount
-      return b.viewCount / b.postCount - a.viewCount / a.postCount
-    })
-    .slice(0, MAX_ROWS)
-    .map((r, i) => ({ ...r, rank: i + 1 }))
+  // ── FASTEST RISING (always vs 24h snapshot) ──────────────────────────
+  const fastestRising: HashtagRow[] = has24hSnapshot
+    ? ftoolboxTags
+        .map((t) => {
+          const snap = snapshot24h[t.tag.toLowerCase()]
+          const deltaViews = snap && snap.v > 0 ? t.viewCount - snap.v : 0
+          const rawPct = snap && snap.v > 0 ? deltaViews / snap.v : 0
+          return { t, deltaViews, rawPct }
+        })
+        .filter((x) => x.deltaViews >= 500 && x.rawPct > 0)
+        .sort((a, b) => b.rawPct - a.rawPct || b.deltaViews - a.deltaViews)
+        .slice(0, MAX_ROWS)
+        .map((x, i) => toRow(x.t.tag, x.t.viewCount, x.t.postCount, i + 1, snapshot24h))
+    : []
 
   // ── LOWEST SATURATION ─────────────────────────────────────────────────
-  // Always current saturation score (postCount/viewCount) — time-agnostic
   const lowestSaturation = [...allRows]
     .filter((r) => r.postCount >= 10)
     .sort((a, b) => a.saturationScore - b.saturationScore)
@@ -94,7 +85,7 @@ async function _fetchAllTags(timeFilter: TimeFilter): Promise<TagsResponse> {
 const makeGetTags = (timeFilter: TimeFilter) =>
   unstable_cache(
     () => _fetchAllTags(timeFilter),
-    [`fansly-tags-v5-${timeFilter}`],
+    [`fansly-tags-v7-${timeFilter}`],
     { revalidate: 10800 }
   )
 
@@ -105,6 +96,17 @@ const _getters = {
   "90d": makeGetTags("90d"),
 }
 
-export async function getTags(timeFilter: TimeFilter = "90d") {
-  return _getters[timeFilter]()
+export async function getTags(
+  timeFilter: TimeFilter = "90d",
+  limit = DEFAULT_LIMIT
+): Promise<TagsResponse> {
+  const data = await _getters[timeFilter]()
+  const n = Math.max(1, Math.min(MAX_ROWS, limit))
+  return {
+    ...data,
+    mostViewed: data.mostViewed.slice(0, n),
+    fastestRising: data.fastestRising.slice(0, n),
+    lowestSaturation: data.lowestSaturation.slice(0, n),
+    highestImpact: data.highestImpact.slice(0, n),
+  }
 }

@@ -63,7 +63,7 @@ export default function HashtagTable({ rows, showChange }: Props) {
     return (
       <div className="flex flex-col items-center justify-center h-40 gap-2">
         <span className="text-[#555] text-sm">No data for this period yet.</span>
-        <span className="text-[#444] text-xs">Snapshots are saved every 3 hours — check back soon.</span>
+        <span className="text-[#444] text-xs">Snapshots are saved once a day — check back tomorrow.</span>
       </div>
     )
   }

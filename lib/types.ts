@@ -7,7 +7,6 @@ export interface HashtagRow {
   postCount: number
   saturationScore: number
   impactScore: number
-  fypFrequency: number
   changePct: number | null  // % change vs snapshot for selected time period (null = no data yet)
   deltaViews: number | null // absolute view count change
 }

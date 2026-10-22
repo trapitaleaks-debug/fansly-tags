@@ -18,7 +18,7 @@ export default async function HighestImpact({ searchParams }: { searchParams: Pr
   return (
     <PageShell
       title="Highest Impact"
-      description="Best balance of high views and low saturation — views × log(FYP activity) ÷ posts^0.4. Use for Core Growth tags."
+      description="Best balance of high views and low saturation — views ÷ (posts + 1)^0.4. Use for Core Growth tags."
       fetchedAt={data?.fetchedAt ?? null}
       tagCount={data?.tagCount}
       hasSnapshotData={data?.hasSnapshotData}

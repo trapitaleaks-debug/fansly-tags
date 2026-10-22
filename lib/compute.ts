@@ -6,21 +6,23 @@ export function saturationScore(postCount: number, viewCount: number): number {
   return postCount / viewCount
 }
 
-export function impactScore(viewCount: number, postCount: number, fypFrequency: number): number {
-  return (viewCount * Math.log(fypFrequency + 2)) / (Math.pow(postCount + 1, 0.4))
+export function impactScore(viewCount: number, postCount: number): number {
+  return viewCount / Math.pow(postCount + 1, 0.4)
 }
 
 export function toRow(
   tag: string,
   viewCount: number,
   postCount: number,
-  fypFrequency: number,
   rank: number,
   snapshot?: SnapshotData | null
 ): HashtagRow {
   const sat = saturationScore(postCount, viewCount)
   const snap = snapshot?.[tag.toLowerCase()]
-  const changePct = snap ? Math.round(((viewCount - snap.v) / snap.v) * 100) : null
+  const changePct =
+    snap && snap.v > 0
+      ? Math.round(((viewCount - snap.v) / snap.v) * 1000) / 10
+      : null
   const deltaViews = snap ? viewCount - snap.v : null
 
   return {
@@ -29,8 +31,7 @@ export function toRow(
     viewCount,
     postCount,
     saturationScore: sat,
-    impactScore: impactScore(viewCount, postCount, fypFrequency),
-    fypFrequency,
+    impactScore: impactScore(viewCount, postCount),
     changePct,
     deltaViews,
   }
@@ -44,6 +45,7 @@ export function formatNumber(n: number): string {
 
 export function formatChangePct(pct: number | null): string {
   if (pct === null) return "—"
-  const sign = pct > 0 ? "+" : ""
-  return `${sign}${pct}%`
+  const rounded = Math.round(pct * 10) / 10
+  const sign = rounded > 0 ? "+" : ""
+  return `${sign}${rounded.toFixed(1)}%`
 }

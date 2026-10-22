@@ -3,7 +3,7 @@ import { fetchTagStats } from "@/lib/fansly-api"
 import { toRow } from "@/lib/compute"
 
 export const dynamic = "force-dynamic"
-export const runtime = "nodejs" // fansly-api → lib/fansly-egress.mjs needs undici + node:fs
+export const runtime = "nodejs"
 
 export async function GET(req: NextRequest) {
   const tag = req.nextUrl.searchParams.get("tag")?.toLowerCase().replace(/^#/, "")
@@ -16,6 +16,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "not found" }, { status: 404 })
   }
 
-  const row = toRow(stats.tag, stats.viewCount, stats.postCount, 0, 0)
+  const row = toRow(stats.tag, stats.viewCount, stats.postCount, 0)
   return NextResponse.json(row)
 }

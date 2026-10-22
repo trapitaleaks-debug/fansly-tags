@@ -16,7 +16,7 @@ export default async function FastestRising() {
       title="Fastest Rising"
       description={data?.hasSnapshotData
         ? "Hashtags with the highest % view growth in the last 24 hours."
-        : "Hashtags most actively used in current Fansly FYP posts. Building 24h history…"}
+        : "Building 24h history…"}
       fetchedAt={data?.fetchedAt ?? null}
       tagCount={data?.tagCount}
       hasSnapshotData={data?.hasSnapshotData}
