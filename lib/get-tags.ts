@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache"
 import { fetchAllTagsFromFToolbox } from "./fansly-api"
-import { toRow } from "./compute"
+import { toRow, risingRows, MIN_RISING } from "./compute"
 import { getSnapshot } from "./kv"
 import type { TagsResponse, TimeFilter, HashtagRow } from "./types"
 
@@ -15,16 +15,9 @@ async function _fetchAllTags(timeFilter: TimeFilter): Promise<TagsResponse> {
     throw new Error(`Insufficient tags from FToolbox: ${ftoolboxTags.length}`)
   }
 
-  const snapshot24h = await getSnapshot("24h")
-  const snapshot =
-    timeFilter === "90d"
-      ? null
-      : timeFilter === "24h"
-        ? snapshot24h
-        : await getSnapshot(timeFilter)
-
-  const hasSnapshotData = snapshot !== null && Object.keys(snapshot).length > 0
-  const has24hSnapshot = snapshot24h !== null && Object.keys(snapshot24h).length > 0
+  const filterSnapshot = timeFilter === "90d" ? null : await getSnapshot(timeFilter)
+  const snapshot = filterSnapshot?.data ?? null
+  const hasSnapshotData = snapshot !== null
 
   const allRows: HashtagRow[] = ftoolboxTags.map((t, i) =>
     toRow(t.tag, t.viewCount, t.postCount, i + 1, snapshot)
@@ -41,20 +34,23 @@ async function _fetchAllTags(timeFilter: TimeFilter): Promise<TagsResponse> {
     .slice(0, MAX_ROWS)
     .map((r, i) => ({ ...r, rank: i + 1 }))
 
-  // ── FASTEST RISING (always vs 24h snapshot) ──────────────────────────
-  const fastestRising: HashtagRow[] = has24hSnapshot
-    ? ftoolboxTags
-        .map((t) => {
-          const snap = snapshot24h[t.tag.toLowerCase()]
-          const deltaViews = snap && snap.v > 0 ? t.viewCount - snap.v : 0
-          const rawPct = snap && snap.v > 0 ? deltaViews / snap.v : 0
-          return { t, deltaViews, rawPct }
-        })
-        .filter((x) => x.deltaViews >= 500 && x.rawPct > 0)
-        .sort((a, b) => b.rawPct - a.rawPct || b.deltaViews - a.deltaViews)
-        .slice(0, MAX_ROWS)
-        .map((x, i) => toRow(x.t.tag, x.t.viewCount, x.t.postCount, i + 1, snapshot24h))
-    : []
+  // ── FASTEST RISING ─────────────────────────────────────────────────────
+  // Compared with the 24h snapshot. FToolbox re-checks each tag about once a day, so a fresh snapshot
+  // shows few risers: then use the next older snapshot until there are MIN_RISING rows, and say so.
+  let fastestRising: HashtagRow[] = []
+  let risingWindow: TimeFilter | null = null
+  let risingSince: number | null = null
+  for (const period of ["24h", "7d", "30d", "90d"] as const) {
+    const snap = period === timeFilter ? filterSnapshot : await getSnapshot(period)
+    if (!snap) continue
+    const rows = risingRows(ftoolboxTags, snap.data)
+    if (rows.length > fastestRising.length) {
+      fastestRising = rows
+      risingWindow = period
+      risingSince = snap.savedAt
+    }
+    if (rows.length >= MIN_RISING) break
+  }
 
   // ── LOWEST SATURATION ─────────────────────────────────────────────────
   const lowestSaturation = [...allRows]
@@ -78,6 +74,8 @@ async function _fetchAllTags(timeFilter: TimeFilter): Promise<TagsResponse> {
     tagCount: allRows.length,
     timeFilter,
     hasSnapshotData,
+    risingWindow,
+    risingSince,
   }
 }
 
@@ -85,7 +83,7 @@ async function _fetchAllTags(timeFilter: TimeFilter): Promise<TagsResponse> {
 const makeGetTags = (timeFilter: TimeFilter) =>
   unstable_cache(
     () => _fetchAllTags(timeFilter),
-    [`fansly-tags-v7-${timeFilter}`],
+    [`fansly-tags-v8-${timeFilter}`],
     { revalidate: 10800 }
   )
 

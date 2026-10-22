@@ -37,6 +37,30 @@ export function toRow(
   }
 }
 
+// Fastest Rising: at least MIN_RISING rows (Vito, 22 Oct). Rank by % view growth; the views-gained
+// floor starts strict and relaxes only until the list reaches MIN_RISING rows.
+export const MIN_RISING = 50
+const RISING_FLOORS = [500, 200, 100, 50, 1]
+const MAX_RISING = 1000
+
+export function risingRows(
+  tags: Array<{ tag: string; viewCount: number; postCount: number }>,
+  snapshot: SnapshotData
+): HashtagRow[] {
+  const risers = tags.flatMap((t) => {
+    const snap = snapshot[t.tag.toLowerCase()]
+    if (!snap || snap.v <= 0 || t.viewCount <= snap.v) return []
+    const delta = t.viewCount - snap.v
+    return [{ t, delta, pct: delta / snap.v }]
+  })
+  const floor = RISING_FLOORS.find((f) => risers.filter((x) => x.delta >= f).length >= MIN_RISING) ?? 1
+  return risers
+    .filter((x) => x.delta >= floor)
+    .sort((a, b) => b.pct - a.pct || b.delta - a.delta)
+    .slice(0, MAX_RISING)
+    .map((x, i) => toRow(x.t.tag, x.t.viewCount, x.t.postCount, i + 1, snapshot))
+}
+
 export function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`

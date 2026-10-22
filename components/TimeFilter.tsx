@@ -13,10 +13,11 @@ const OPTIONS: { value: TimeFilter; label: string }[] = [
 
 interface Props {
   locked?: boolean           // true for Fastest Rising (always 24h, no picker)
+  lockedLabel?: string       // shown instead of "24h" while Fastest Rising uses an older snapshot
   hasSnapshotData?: boolean  // false on first run before snapshots exist
 }
 
-export default function TimeFilter({ locked, hasSnapshotData }: Props) {
+export default function TimeFilter({ locked, lockedLabel, hasSnapshotData }: Props) {
   const pathname = usePathname()
   const params = useSearchParams()
   const current = (params.get("filter") as TimeFilter) ?? "90d"
@@ -26,7 +27,7 @@ export default function TimeFilter({ locked, hasSnapshotData }: Props) {
       <div className="flex items-center gap-2">
         <span className="text-xs text-[#555]">Period:</span>
         <span className="px-3 py-1 text-xs font-medium rounded-full bg-[#dc2626]/10 text-[#dc2626] border border-[#dc2626]/30">
-          24h
+          {lockedLabel ?? "24h"}
         </span>
         <span className="text-xs text-[#444]">locked</span>
       </div>

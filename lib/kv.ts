@@ -42,7 +42,12 @@ export async function saveSnapshot(
   return { key, saved: res === "OK", tagCount: Object.keys(data).length }
 }
 
-export async function getSnapshot(period: TimeFilter): Promise<SnapshotData | null> {
+export interface Snapshot {
+  data: SnapshotData
+  savedAt: number | null // ms; dated keys count from the 04:00Z cron
+}
+
+export async function getSnapshot(period: TimeFilter): Promise<Snapshot | null> {
   const baseDays = DAYS_AGO[period]
   const candidateKeys = [
     ...Array.from({ length: LOOKBACK_FALLBACK_DAYS + 1 }, (_, i) => dateKey(baseDays + i)),
@@ -52,7 +57,10 @@ export async function getSnapshot(period: TimeFilter): Promise<SnapshotData | nu
   try {
     for (const key of candidateKeys) {
       const data = await kv.get<SnapshotData>(key)
-      if (data && Object.keys(data).length > 0) return data
+      if (!data || Object.keys(data).length === 0) continue
+      const day = key.match(/^snapshot:(\d{4}-\d{2}-\d{2})$/)?.[1]
+      const savedAt = day ? Date.parse(`${day}T04:00:00Z`) : await kv.get<number>(`${key}:savedAt`)
+      return { data, savedAt: savedAt ?? null }
     }
     return null
   } catch {

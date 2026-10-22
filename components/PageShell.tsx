@@ -11,11 +11,12 @@ interface Props {
   children: React.ReactNode
   error?: string | null
   lockedFilter?: boolean
+  lockedLabel?: string
   hasSnapshotData?: boolean
 }
 
 export default function PageShell({
-  title, description, fetchedAt, tagCount, children, error, lockedFilter, hasSnapshotData
+  title, description, fetchedAt, tagCount, children, error, lockedFilter, lockedLabel, hasSnapshotData
 }: Props) {
   return (
     <div className="flex flex-col min-h-screen bg-black">
@@ -29,7 +30,7 @@ export default function PageShell({
             <p className="text-sm text-[#555] mt-1">{description}</p>
           </div>
           <Suspense fallback={null}>
-            <TimeFilter locked={lockedFilter} hasSnapshotData={hasSnapshotData} />
+            <TimeFilter locked={lockedFilter} lockedLabel={lockedLabel} hasSnapshotData={hasSnapshotData} />
           </Suspense>
         </div>
 
