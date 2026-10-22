@@ -42,6 +42,34 @@ export async function saveSnapshot(
   return { key, saved: res === "OK", tagCount: Object.keys(data).length }
 }
 
+const DATED = /^snapshot:(\d{4}-\d{2}-\d{2})$/
+const savedAtOf = async (key: string) => {
+  const day = key.match(DATED)?.[1]
+  return day ? Date.parse(`${day}T04:00:00Z`) : await kv.get<number>(`${key}:savedAt`)
+}
+
+// Every saved snapshot, newest first: dated keys from the daily cron and the legacy rotation keys.
+export async function listSnapshots(): Promise<Array<{ key: string; savedAt: number }>> {
+  try {
+    const keys = (await kv.keys("snapshot:*")).filter((k) => !k.endsWith(":savedAt"))
+    const found = await Promise.all(keys.map(async (key) => ({ key, savedAt: await savedAtOf(key) })))
+    return found
+      .filter((s): s is { key: string; savedAt: number } => typeof s.savedAt === "number")
+      .sort((a, b) => b.savedAt - a.savedAt)
+  } catch {
+    return []
+  }
+}
+
+export async function loadSnapshot(key: string): Promise<SnapshotData | null> {
+  try {
+    const data = await kv.get<SnapshotData>(key)
+    return data && Object.keys(data).length > 0 ? data : null
+  } catch {
+    return null
+  }
+}
+
 export interface Snapshot {
   data: SnapshotData
   savedAt: number | null // ms; dated keys count from the 04:00Z cron
@@ -58,9 +86,7 @@ export async function getSnapshot(period: TimeFilter): Promise<Snapshot | null> 
     for (const key of candidateKeys) {
       const data = await kv.get<SnapshotData>(key)
       if (!data || Object.keys(data).length === 0) continue
-      const day = key.match(/^snapshot:(\d{4}-\d{2}-\d{2})$/)?.[1]
-      const savedAt = day ? Date.parse(`${day}T04:00:00Z`) : await kv.get<number>(`${key}:savedAt`)
-      return { data, savedAt: savedAt ?? null }
+      return { data, savedAt: (await savedAtOf(key)) ?? null }
     }
     return null
   } catch {

@@ -37,26 +37,27 @@ export function toRow(
   }
 }
 
-// Fastest Rising: at least MIN_RISING rows (Vito, 22 Oct). Rank by % view growth; the views-gained
-// floor starts strict and relaxes only until the list reaches MIN_RISING rows.
+// Fastest Rising: at least MIN_RISING rows (Vito, 22 Oct). Tags that gained STRONG_GAIN+ views lead,
+// each group ranked by % growth; gains under MIN_PCT are left out (they would show as "0.0%").
 export const MIN_RISING = 50
-const RISING_FLOORS = [500, 200, 100, 50, 1]
+const STRONG_GAIN = 500
+const MIN_PCT = 0.0005
 const MAX_RISING = 1000
 
 export function risingRows(
   tags: Array<{ tag: string; viewCount: number; postCount: number }>,
   snapshot: SnapshotData
 ): HashtagRow[] {
-  const risers = tags.flatMap((t) => {
-    const snap = snapshot[t.tag.toLowerCase()]
-    if (!snap || snap.v <= 0 || t.viewCount <= snap.v) return []
-    const delta = t.viewCount - snap.v
-    return [{ t, delta, pct: delta / snap.v }]
-  })
-  const floor = RISING_FLOORS.find((f) => risers.filter((x) => x.delta >= f).length >= MIN_RISING) ?? 1
-  return risers
-    .filter((x) => x.delta >= floor)
-    .sort((a, b) => b.pct - a.pct || b.delta - a.delta)
+  return tags
+    .flatMap((t) => {
+      const snap = snapshot[t.tag.toLowerCase()]
+      if (!snap || snap.v <= 0) return []
+      const delta = t.viewCount - snap.v
+      const pct = delta / snap.v
+      return delta > 0 && pct >= MIN_PCT ? [{ t, delta, pct }] : []
+    })
+    .sort((a, b) =>
+      Number(b.delta >= STRONG_GAIN) - Number(a.delta >= STRONG_GAIN) || b.pct - a.pct || b.delta - a.delta)
     .slice(0, MAX_RISING)
     .map((x, i) => toRow(x.t.tag, x.t.viewCount, x.t.postCount, i + 1, snapshot))
 }

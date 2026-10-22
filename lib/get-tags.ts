@@ -1,13 +1,32 @@
 import { unstable_cache } from "next/cache"
 import { fetchAllTagsFromFToolbox } from "./fansly-api"
 import { toRow, risingRows, MIN_RISING } from "./compute"
-import { getSnapshot } from "./kv"
+import { getSnapshot, listSnapshots, loadSnapshot } from "./kv"
 import type { TagsResponse, TimeFilter, HashtagRow } from "./types"
 
 const MIN_VIEWS = 5000
 const MIN_TAGS = 3000
 const MAX_ROWS = 1000
 const DEFAULT_LIMIT = 100
+const RISING_MIN_AGE_MS = 20 * 3600_000 // FToolbox re-checks each tag about once a day
+const RISING_MAX_LOADS = 10             // snapshots are ~200KB each
+
+// Fastest Rising compares with the newest snapshot that is about a day old; older ones (then younger
+// ones) only while the list is short of MIN_RISING rows.
+async function pickRising(tags: Array<{ tag: string; viewCount: number; postCount: number }>, now: number) {
+  const snaps = await listSnapshots()
+  const aged = snaps.filter((s) => now - s.savedAt >= RISING_MIN_AGE_MS)
+  const young = snaps.filter((s) => now - s.savedAt < RISING_MIN_AGE_MS)
+  let best: { rows: HashtagRow[]; since: number | null } = { rows: [], since: null }
+  for (const s of [...aged, ...young].slice(0, RISING_MAX_LOADS)) {
+    const data = await loadSnapshot(s.key)
+    if (!data) continue
+    const rows = risingRows(tags, data)
+    if (rows.length > best.rows.length) best = { rows, since: s.savedAt }
+    if (rows.length >= MIN_RISING) break
+  }
+  return best
+}
 
 async function _fetchAllTags(timeFilter: TimeFilter): Promise<TagsResponse> {
   const ftoolboxTags = await fetchAllTagsFromFToolbox(MIN_VIEWS)
@@ -35,22 +54,8 @@ async function _fetchAllTags(timeFilter: TimeFilter): Promise<TagsResponse> {
     .map((r, i) => ({ ...r, rank: i + 1 }))
 
   // ── FASTEST RISING ─────────────────────────────────────────────────────
-  // Compared with the 24h snapshot. FToolbox re-checks each tag about once a day, so a fresh snapshot
-  // shows few risers: then use the next older snapshot until there are MIN_RISING rows, and say so.
-  let fastestRising: HashtagRow[] = []
-  let risingWindow: TimeFilter | null = null
-  let risingSince: number | null = null
-  for (const period of ["24h", "7d", "30d", "90d"] as const) {
-    const snap = period === timeFilter ? filterSnapshot : await getSnapshot(period)
-    if (!snap) continue
-    const rows = risingRows(ftoolboxTags, snap.data)
-    if (rows.length > fastestRising.length) {
-      fastestRising = rows
-      risingWindow = period
-      risingSince = snap.savedAt
-    }
-    if (rows.length >= MIN_RISING) break
-  }
+  const now = Date.now()
+  const rising = await pickRising(ftoolboxTags, now)
 
   // ── LOWEST SATURATION ─────────────────────────────────────────────────
   const lowestSaturation = [...allRows]
@@ -67,15 +72,14 @@ async function _fetchAllTags(timeFilter: TimeFilter): Promise<TagsResponse> {
 
   return {
     mostViewed,
-    fastestRising,
+    fastestRising: rising.rows,
     lowestSaturation,
     highestImpact,
-    fetchedAt: Date.now(),
+    fetchedAt: now,
     tagCount: allRows.length,
     timeFilter,
     hasSnapshotData,
-    risingWindow,
-    risingSince,
+    risingSince: rising.since,
   }
 }
 

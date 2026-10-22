@@ -22,6 +22,5 @@ export interface TagsResponse {
   tagCount: number
   timeFilter: TimeFilter
   hasSnapshotData: boolean // false on first run before any snapshots saved
-  risingWindow: TimeFilter | null // snapshot Fastest Rising compared with (24h unless that is too fresh)
-  risingSince: number | null      // when that snapshot was taken (ms)
+  risingSince: number | null // when the snapshot Fastest Rising compares with was taken (ms)
 }

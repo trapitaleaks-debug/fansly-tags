@@ -4,6 +4,7 @@ import { getTags } from "@/lib/get-tags"
 
 export const dynamic = "force-dynamic"
 
+const DAY_LABEL_MAX_AGE_MS = 48 * 3600_000 // daily snapshots: "the last day" covers a 20-48 h old one
 const day = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })
 
 export default async function FastestRising() {
@@ -14,22 +15,22 @@ export default async function FastestRising() {
   }
 
   const rows = data?.fastestRising ?? []
-  const older = data?.risingWindow && data.risingWindow !== "24h"
-  const since = older && data?.risingSince ? day(data.risingSince) : null
+  const since = data?.risingSince ?? null
+  const lastDay = since !== null && data !== null && data.fetchedAt - since <= DAY_LABEL_MAX_AGE_MS
 
   return (
     <PageShell
       title="Fastest Rising"
-      description={rows.length === 0
+      description={rows.length === 0 || since === null
         ? "Building 24h history…"
-        : older
-          ? `Hashtags with the highest % view growth${since ? ` since ${since}` : ""}. 24h history is still building.`
-          : "Hashtags with the highest % view growth in the last 24 hours."}
+        : lastDay
+          ? "Hashtags with the highest % view growth over the last day."
+          : `Hashtags with the highest % view growth since ${day(since)}.`}
       fetchedAt={data?.fetchedAt ?? null}
       tagCount={data?.tagCount}
       hasSnapshotData={rows.length > 0}
       lockedFilter
-      lockedLabel={older ? (since ? `since ${since}` : data?.risingWindow ?? undefined) : undefined}
+      lockedLabel={since !== null && !lastDay ? `since ${day(since)}` : undefined}
       error={error}
     >
       <HashtagTable rows={rows} showChange={rows.length > 0} />

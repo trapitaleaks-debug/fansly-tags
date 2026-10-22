@@ -20,27 +20,27 @@ test("impact no longer depends on FYP", () => {
 })
 
 const tags = (n, prefix, views, gain) =>
-  Array.from({ length: n }, (_, i) => ({ tag: `${prefix}${i}`, viewCount: views + gain + i, postCount: 10 }))
+  Array.from({ length: n }, (_, i) => ({ tag: `${prefix}${i}`, viewCount: views + gain, postCount: 10 }))
 const snapOf = (list, gainOf) =>
   Object.fromEntries(list.map((t) => [t.tag, { v: t.viewCount - gainOf(t), p: 10 }]))
 
-test("rising keeps the strict 500-view floor when it already gives 50 rows", () => {
-  const big = tags(60, "big", 100_000, 600), small = tags(10, "small", 5_000, 50)
-  const all = [...big, ...small]
-  const rows = risingRows(all, snapOf(all, (t) => (t.tag.startsWith("big") ? 600 : 50)))
-  assert.equal(rows.length, 60)
-  assert.ok(rows.every((r) => r.tag.startsWith("big")))
+test("rising: tags that gained 500+ views lead, even with a lower %", () => {
+  const big = tags(3, "big", 500_000, 4_000)   // +0.8%
+  const small = tags(3, "small", 5_000, 50)    // +1.0%
+  const all = [...small, ...big]
+  const rows = risingRows(all, snapOf(all, (t) => (t.tag.startsWith("big") ? 4_000 : 50)))
+  assert.deepEqual(rows.map((r) => r.tag.replace(/\d/, "")), ["big", "big", "big", "small", "small", "small"])
+  assert.deepEqual(rows.map((r) => r.rank), [1, 2, 3, 4, 5, 6])
 })
 
-test("rising relaxes the floor until it has 50 rows, ranked by % growth", () => {
-  const all = tags(70, "t", 5_000, 0)
-  const rows = risingRows(all, snapOf(all, () => 20))
-  assert.equal(rows.length, 70)
-  assert.equal(rows[0].rank, 1)
-  assert.ok(rows[0].changePct >= rows[69].changePct)
+test("rising: all 70 small risers are kept so the page can reach 50 rows", () => {
+  const all = tags(70, "t", 5_000, 20)
+  assert.equal(risingRows(all, snapOf(all, () => 20)).length, 70)
 })
 
-test("rising never lists tags that did not grow", () => {
-  const all = tags(5, "t", 5_000, 0)
-  assert.equal(risingRows(all, snapOf(all, () => 0)).length, 0)
+test("rising: no tags that shrank, stayed flat or would show as 0.0%", () => {
+  const flat = tags(2, "flat", 5_000, 0), down = tags(2, "down", 5_000, 0), tiny = tags(2, "tiny", 1_000_000, 100)
+  const all = [...flat, ...down, ...tiny]
+  const gain = (t) => (t.tag.startsWith("down") ? -10 : t.tag.startsWith("tiny") ? 100 : 0) // tiny: +0.01%
+  assert.equal(risingRows(all, snapOf(all, gain)).length, 0)
 })
