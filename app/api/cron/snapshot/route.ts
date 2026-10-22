@@ -12,6 +12,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // ?check=1 is read-only: the nightly proven-running check asks whether today's snapshot exists
+    if (req.nextUrl.searchParams.has("check")) {
+      return NextResponse.json({ key: dateKey(0), exists: await hasTodaySnapshot() })
+    }
     if (await hasTodaySnapshot()) {
       return NextResponse.json({ ok: true, key: dateKey(0), saved: false, tagCount: 0 })
     }
