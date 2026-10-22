@@ -92,13 +92,14 @@ export async function fetchAllTagsFromFToolbox(minViews = 5000): Promise<FanslyT
 export async function fetchTagStats(tagName: string): Promise<FanslyTag | null> {
   try {
     const res = await fetch(
-      `${FTOOLBOX_BASE}/tags?limit=1&search=${encodeURIComponent(tagName)}`,
+      `${FTOOLBOX_BASE}/tags?limit=50&search=${encodeURIComponent(tagName)}`,
       { headers: HEADERS, signal: AbortSignal.timeout(8000) }
     )
     if (!res.ok) return null
     const data: FToolboxResponse = await res.json()
-    const tag = data.tags?.[0]
-    if (!tag || tag.isDeleted || tag.tag.toLowerCase() !== tagName.toLowerCase()) {
+    // search= is a substring match sorted by views ("cat" → catgirl first), so pick the exact tag
+    const tag = data.tags?.find((t) => t.tag.toLowerCase() === tagName.toLowerCase())
+    if (!tag || tag.isDeleted) {
       return null
     }
     return {
