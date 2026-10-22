@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { kv } from "@vercel/kv"
 import { fetchAllTagsFromFToolbox } from "@/lib/fansly-api"
 import { dateKey, hasTodaySnapshot, saveSnapshot } from "@/lib/kv"
 
@@ -12,9 +13,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // ?check=1 is read-only: the nightly proven-running check asks whether today's snapshot exists
-    if (req.nextUrl.searchParams.has("check")) {
-      return NextResponse.json({ key: dateKey(0), exists: await hasTodaySnapshot() })
+    // ?check=<daysAgo> is read-only: the nightly proven-running check asks whether that day's snapshot exists
+    const check = req.nextUrl.searchParams.get("check")
+    if (check !== null) {
+      const key = dateKey(Math.max(0, Math.min(100, Number(check) || 0)))
+      return NextResponse.json({ key, exists: (await kv.exists(key)) > 0 })
     }
     if (await hasTodaySnapshot()) {
       return NextResponse.json({ ok: true, key: dateKey(0), saved: false, tagCount: 0 })
